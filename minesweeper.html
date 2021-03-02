@@ -1,0 +1,172 @@
+
+<style>
+	.row {
+		display: flex;
+	}
+	.col {
+		width: 20px;
+		height: 20px;
+		margin-right: -1px;
+		margin-left: -1px;
+		border: solid 1px black;
+		background-color: lightgray;
+		font-weight: bold;
+	}
+</style>
+<dive id='GridView'>
+</dive>
+<script>
+
+	//A class representing the single cell of a game board
+	class Cell {
+		constructor(x,y,isBomb) {
+			this.x = x;
+			this.y = y;
+			this.isBomb = isBomb;
+			this.proximity = 0; //How many bombs around this one
+			this.isFlipped = false;
+		}
+	}
+
+	//Game logic engine
+	class Game {
+		constructor(grid, width, length, num) {
+			this.grid = grid;
+			this.width = width;
+			this.length = length;
+			this.num = num; //Number of bombs
+			this.bombLocs = {}; //List of bomb locations
+			this.isFinished = false; //Flag to see if game should stop or not
+			this.numCells = (grid*width)-num; //Counter for flipped cells, used to see if game is over
+
+			//Randomly assign bomb locations
+			var numBomb;
+			for ( numBomb = 0; numBomb!=num; numBomb++){
+				let x = Math.floor((Math.random() *width));
+				let y = Math.floor((Math.random() *length));
+
+				if (this.bombLocs[x+'-'+y]!==undefined){
+					numBomb--;
+				} else {
+					this.bombLocs[x+'-'+y] = true;
+				}
+			}
+
+			//Populate the cells with neighbouring bomb counters
+			this.boardState = [];
+			var x, y;
+			for ( x = 0; x!=width; x++ ){
+				var row = document.createElement('div');
+				row.classList.add('row')
+				for ( y = 0; y!=length; y++ ){
+					var col = document.createElement('span');
+					col.id= x+'-'+y;
+					col.classList.add('col')
+
+					/*
+						This part populates the proximity number as the bombs are being populated.
+						All the cells around the bomb have their proximity counter incremented.
+					*/
+					if (this.bombLocs[col.id]){
+						//All the cells around current cell
+						let updateList = [[x-1,y-1],[x,y-1],[x+1,y-1],[x-1,y],[x,y],[x+1,y],[x-1,y+1],[x,y+1],[x+1,y+1]];
+						for (let loc of updateList) {
+							let x = +loc[0];
+							let y = +loc[1];
+							if (!(x<0 || x>width || y<0 || y>length)) { //See if point is out of bounds
+								if (this.boardState[x]==undefined) {
+									this.boardState[x] = []; //Create new row if undefined
+								}
+								if (this.boardState[x][y]==undefined) {
+									this.boardState[x][y] = new Cell(x,y,false);
+								}
+								this.boardState[x][y].proximity++; //Actually add to the proximity
+							}
+						}
+						this.boardState[x][y] = new Cell(x,y,true);
+
+					} else {
+						if (this.boardState[x]==undefined) {
+							this.boardState[x] = [];//Create new row if undefined
+						}
+						if (this.boardState[x][y]==undefined) {
+							this.boardState[x][y] = new Cell(x,y,false);
+						}
+					}
+					// Click behavior for the cells
+					var game = this;
+					col.addEventListener('mouseup',function(event){
+						if (game.isFinished) {
+							//Dont do anything if game is finished
+							return;
+						}
+						let id = this.id;
+						//Actually do the flipping
+						if (game.bombLocs[id]) { //Flip for bomb, game is over
+							game.isFinished = true;
+							let cell = document.getElementById(id);
+							cell.innerHTML = 'X';
+							cell.style.background = 'darkGrey'
+							alert('Game over!')
+						} else { //Flip cell
+							var updateList = [[+id.split('-')[0],+id.split('-')[1]]];
+							var index = 0
+							while (updateList.length>0 ){
+								var coord = updateList.shift();
+								var x = +coord[0];
+								var y = +coord[1];
+								if (x>=0 && x<width && y>=0 && y<length) { //See if cell is in bounds
+									var state = game.boardState[x][y];
+									let cell = document.getElementById(x+'-'+y);
+									//Ignore cell if its already flipped or a bomb
+									if (!state.isBomb && !state.isFlipped){
+										if (state.proximity>0){ //Flip a proximate cell
+											cell.innerHTML = state.proximity;
+											if (state.proximity == 1) {
+												cell.style.color = 'blue';
+											} else if (state.proximity == 2) {
+												cell.style.color = 'green';
+											} else if (state.proximity == 3) {
+												cell.style.color = 'red';
+											} else if (state.proximity == 4) {
+												cell.style.color = 'darkBlue';
+											} else if (state.proximity == 5) {
+												cell.style.color = 'turquoise';
+											} else if (state.proximity == 6) {
+												cell.style.color = 'teal';
+											} else if (state.proximity == 7) {
+												cell.style.color = 'black';
+											} else if (state.proximity == 8) {
+												cell.style.color = 'grey';
+											} 
+										} else {
+											//If no bomb nearby, add all valid neighbouring cells to the update list
+											updateList = updateList.concat([[x-1,y-1],[x,y-1],[x+1,y-1],[x-1,y],[x,y],[x+1,y],[x-1,y+1],[x,y+1],[x+1,y+1]]);
+										}
+										cell.style.background = 'darkGrey';
+										state.isFlipped = true;
+
+										//Count down for the game
+										game.numCells--;
+										if (game.numCells == 0) {
+											game.isFinished = true;
+											alert('You win!')
+										}
+									}
+								}
+
+							}
+						}
+
+					})
+					row.appendChild(col);
+				}
+				grid.appendChild(row);
+			}
+		}
+	}
+
+	//Start game
+	var grid = document.getElementById('GridView');
+	Game = new Game(grid, 10, 15, 20) //Expose as global for debugging purposes
+</script>
